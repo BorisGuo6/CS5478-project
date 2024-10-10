@@ -334,7 +334,8 @@ def parse_arguments(description="Isaac Gym Example", headless=False, no_graphics
             print("supported keys: name, type, default, action, help")
             print()
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     args.sim_device_type, args.compute_device_id = parse_device_str(args.sim_device)
     pipeline = args.pipeline.lower()
