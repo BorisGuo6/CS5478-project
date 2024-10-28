@@ -4,9 +4,18 @@ import torch
 class task_config:
     seed = 1
     sim_name = "base_sim"
-    env_name = "empty_env"
+    # env_name = "empty_env"
+    env_name = "env_with_obstacles"
+    # env_name = "forest_env"
+
     robot_name = "base_quadrotor"
+    # robot_name = "base_fully_actuated"
+    # robot_name = "base_random"
+
+
     controller_name = "lee_attitude_control"
+    # controller_name = "lee_acceleration_control"
+    # controller_name = "no-control"
     args = {}
     num_envs = 16
     use_warp = False

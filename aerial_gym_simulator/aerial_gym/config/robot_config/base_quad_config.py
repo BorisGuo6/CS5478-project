@@ -5,6 +5,9 @@ from aerial_gym import AERIAL_GYM_DIRECTORY
 from aerial_gym.config.sensor_config.camera_config.base_depth_camera_config import (
     BaseDepthCameraConfig,
 )
+from aerial_gym.config.sensor_config.camera_config.d455_depth_config import (
+    RsD455Config,
+)
 from aerial_gym.config.sensor_config.lidar_config.base_lidar_config import (
     BaseLidarConfig,
 )
@@ -49,12 +52,12 @@ class BaseQuadCfg:
 
     class sensor_config:
         enable_camera = True
-        camera_config = BaseDepthCameraConfig
+        camera_config = RsD455Config #BaseDepthCameraConfig
 
         enable_lidar = False
         lidar_config = BaseLidarConfig  # OSDome_64_Config
 
-        enable_imu = False
+        enable_imu = True  #False
         imu_config = BaseImuConfig
 
     class disturbance:
