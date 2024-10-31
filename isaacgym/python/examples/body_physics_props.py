@@ -19,7 +19,7 @@ presents the following:
 - Apply body force
 - Apply body linear velocity
 """
-
+import numpy as np
 from isaacgym import gymutil
 from isaacgym import gymapi
 
@@ -74,6 +74,9 @@ env_upper = gymapi.Vec3(spacing, spacing, spacing)
 envs = []
 box_handles = []
 actor_handles = []
+
+# subscribe to spacebar event for reset
+gym.subscribe_viewer_keyboard_event(viewer, gymapi.KEY_R, "reset")
 
 # create box assets w/ varying densities (measured in kg/m^3)
 box_size = 0.2
@@ -205,7 +208,15 @@ cam_pos = gymapi.Vec3(6, 4.5, 3)
 cam_target = gymapi.Vec3(-0.8, 0.5, 0)
 gym.viewer_camera_look_at(viewer, None, cam_pos, cam_target)
 
+# create a local copy of initial state, which we can send back for reset
+initial_state = np.copy(gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL))
+
+
 while not gym.query_viewer_has_closed(viewer):
+    # Get input actions from the viewer and handle them appropriately
+    for evt in gym.query_viewer_action_events(viewer):
+        if evt.action == "reset" and evt.value > 0:
+            gym.set_sim_rigid_body_states(sim, initial_state, gymapi.STATE_ALL)
 
     # step the physics
     gym.simulate(sim)
