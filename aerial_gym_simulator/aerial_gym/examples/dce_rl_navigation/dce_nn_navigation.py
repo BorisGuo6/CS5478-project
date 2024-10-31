@@ -57,8 +57,6 @@ def sample_command(args):
             print(f"Resetting environments {truncated_envs} due to Timeout")
         nn_model.reset(reset_ids)
 
-
-
     # # Uncomment the below lines to save the frames from an episode as a GIF
     #     # save obs to file as a .gif
     #     image1 = (
