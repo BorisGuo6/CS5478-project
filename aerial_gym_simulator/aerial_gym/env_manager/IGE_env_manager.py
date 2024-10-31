@@ -193,6 +193,19 @@ class IsaacGymEnv(BaseManager):
                 env_handle, asset_handle
             )
 
+        # set a linear velocity for the asset_type object
+        if asset_info_dict["asset_type"] == "objects":
+            linear_velocity = gymapi.Vec3(
+                np.random.uniform(-2, 2), np.random.uniform(-2, 2), np.random.uniform(-2, 2)
+            )
+            self.gym.set_rigid_linear_velocity(
+                env_handle,
+                self.gym.get_actor_rigid_body_handle(env_handle, asset_handle, 0),
+                linear_velocity,
+            )
+            print(f"Setting linear velocity for {asset_info_dict['asset_type']} to {linear_velocity}")
+
+
         if asset_info_dict["per_link_semantic"]:
             rigid_body_names_all = self.gym.get_actor_rigid_body_names(env_handle, asset_handle)
 
