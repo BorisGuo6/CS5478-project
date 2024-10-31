@@ -60,7 +60,7 @@ class task_config:
         return_sampled_latent = True
 
     class curriculum:
-        min_level = 10
+        min_level = 40
         max_level = 45
         check_after_log_instances = 2048
         increase_step = 2
