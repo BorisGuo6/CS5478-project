@@ -194,9 +194,6 @@ class IsaacGymEnv(BaseManager):
             self.num_rigid_bodies_robot = self.gym.get_actor_rigid_body_count(
                 env_handle, asset_handle
             )
-        
-        if asset_info_dict["asset_type"] == "objects":
-            self.obstacle_handles.append((global_asset_counter,env_id))
 
         if asset_info_dict["per_link_semantic"]:
             rigid_body_names_all = self.gym.get_actor_rigid_body_names(env_handle, asset_handle)
@@ -433,8 +430,8 @@ class IsaacGymEnv(BaseManager):
         Perform any necessary operations before the physics step
         """
         # apply forces and torques to the appropriate rigid bodies
-        if self.cfg.env.write_to_sim_at_every_timestep:
-            self.write_to_sim()
+        # if self.cfg.env.write_to_sim_at_every_timestep:
+        #     self.write_to_sim()
         self.gym.apply_rigid_body_force_tensors(
             self.sim,
             gymtorch.unwrap_tensor(self.global_tensor_dict["global_force_tensor"]),
