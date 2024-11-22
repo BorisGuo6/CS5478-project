@@ -94,6 +94,7 @@ class NavigationTask(BaseTask):
         # Get the dictionary once from the environment and use it to get the observations later.
         # This is to avoid constant retuning of data back anf forth across functions as the tensors update and can be read in-place.
         self.obs_dict = self.sim_env.get_obs()
+        self.bak_obs_dict = self.obs_dict.copy() # backup obs_dict for any errors
         if "curriculum_level" not in self.obs_dict.keys():
             self.curriculum_level = self.task_config.curriculum.min_level
             self.obs_dict["curriculum_level"] = self.curriculum_level
@@ -115,7 +116,13 @@ class NavigationTask(BaseTask):
                     high=1.0,
                     shape=(self.task_config.observation_space_dim,),
                     dtype=np.float32,
-                )
+                ),
+                "image_obs": Box(
+                    low=-1.0,
+                    high=1.0,
+                    shape=(1, 135, 240),
+                    dtype=np.float32,
+                ),
             }
         )
         self.action_space = Box(low=-1.0, high=1.0, shape=(4,), dtype=np.float32)
@@ -268,7 +275,8 @@ class NavigationTask(BaseTask):
 
     def process_image_observation(self):
         image_obs = self.obs_dict["depth_range_pixels"].squeeze(1)
-        self.image_latents[:] = self.vae_model.encode(image_obs)
+        if self.task_config.vae_config.use_vae:
+            self.image_latents[:] = self.vae_model.encode(image_obs)
         # # comments to make sure the VAE does as expected
         # decoded_image = self.vae_model.decode(self.image_latents[0].unsqueeze(0))
         # image0 = image_obs[0].cpu().numpy()
@@ -281,6 +289,16 @@ class NavigationTask(BaseTask):
         # plt.imsave(f"image0{self.img_ctr}.png", image0, vmin=0, vmax=1)
         # plt.imsave(f"decoded_image0{self.img_ctr}.png", decoded_image0, vmin=0, vmax=1)
 
+    def check_obs_dict(self, obs_dict):
+        for key in obs_dict.keys():
+            if isinstance(obs_dict[key], torch.Tensor):
+                if torch.isnan(obs_dict[key]).any():
+                    logger.error(f"Key: {key} is nan, setting it to the previous value")
+                    obs_dict[key] = self.bak_obs_dict[key]
+                else:
+                    logger.debug(f"Key: {key} is not nan, saving it to the backup")
+                    self.bak_obs_dict[key] = obs_dict[key].clone()
+
     def step(self, actions):
         # this uses the action, gets observations
         # calculates rewards, returns tuples
@@ -289,14 +307,30 @@ class NavigationTask(BaseTask):
         # needs to be returned.
 
         transformed_action = self.action_transformation_function(actions)
-        logger.debug(f"raw_action: {actions[0]}, transformed action: {transformed_action[0]}")
-        self.sim_env.step(actions=transformed_action)
+        # backup obs_dict before step
+        # self.check_obs_dict(self.obs_dict)    
+        logger.debug(f"raw_action: {actions}, transformed action: {transformed_action}")
+        #add the obstacle actions here
+        num_assets_in_env = self.sim_env.IGE_env.num_assets_per_env - 1
+        asset_twist = torch.zeros(
+            (self.num_envs, num_assets_in_env, 6), device=self.device, requires_grad=False
+        )
+        if self.sim_env.cfg.env.write_to_sim_at_every_timestep:
+            asset_twist[:, :, 0] = torch.sin(0.2 * self.num_task_steps * torch.ones_like(asset_twist[:, :, 0])) * 0.00002 * self.curriculum_level 
+            asset_twist[:, :, 1] = torch.cos(0.2 * self.num_task_steps * torch.ones_like(asset_twist[:, :, 1])) * 0.00002 * self.curriculum_level 
+            asset_twist[:, :, 2] = 0.0
+            self.sim_env.step(actions=transformed_action, env_actions=asset_twist)
+            # self.obs_dict = self.sim_env.get_obs()
+            logger.debug(f'[STEP] robot_vehicle_orientation :{self.obs_dict["robot_vehicle_orientation"]}')
+            # self.check_obs_dict(self.obs_dict)
+        else:
+            self.sim_env.step(actions=transformed_action)
 
         # This step must be done since the reset is done after the reward is calculated.
         # This enables the robot to send back an updated state, and an updated observation to the RL agent after the reset.
         # This is important for the RL agent to get the correct state after the reset.
         self.rewards[:], self.terminations[:] = self.compute_rewards_and_crashes(self.obs_dict)
-
+        logger.debug(f"reward: {self.rewards[0]}, termination: {self.terminations[0]}")
         # logger.info(f"Curricluum Level: {self.curriculum_level}")
 
         if self.task_config.return_state_before_reset == True:
@@ -336,9 +370,18 @@ class NavigationTask(BaseTask):
         self.num_task_steps += 1
         # do stuff with the image observations here
         self.process_image_observation()
+        self.post_image_reward_addition()
         if self.task_config.return_state_before_reset == False:
             return_tuple = self.get_return_tuple()
         return return_tuple
+
+    def post_image_reward_addition(self):
+        image_obs = 10.0 * self.obs_dict["depth_range_pixels"].squeeze(1)
+        image_obs[image_obs < 0] = 10.0
+        self.min_pixel_dist = torch.amin(image_obs, dim=(1, 2))
+        self.rewards[self.terminations < 0] += -exponential_reward_function(
+            4.0, 1.0, self.min_pixel_dist[self.terminations < 0]
+        )
 
     def get_return_tuple(self):
         self.process_obs_for_task()
@@ -351,18 +394,32 @@ class NavigationTask(BaseTask):
         )
 
     def process_obs_for_task(self):
-        self.task_obs["observations"][:, 0:3] = quat_rotate_inverse(
+        vec_to_tgt = quat_rotate_inverse(
             self.obs_dict["robot_vehicle_orientation"],
             (self.target_position - self.obs_dict["robot_position"]),
         )
-        self.task_obs["observations"][:, 3:7] = self.obs_dict["robot_vehicle_orientation"]
+        perturbed_vec_to_tgt = vec_to_tgt + 0.1 * 2 * (torch.rand_like(vec_to_tgt - 0.5))
+        dist_to_tgt = torch.norm(vec_to_tgt, dim=-1)
+        perturbed_unit_vec_to_tgt = perturbed_vec_to_tgt / dist_to_tgt.unsqueeze(1)
+        self.task_obs["observations"][:, 0:3] = perturbed_unit_vec_to_tgt
+        self.task_obs["observations"][:, 3] = dist_to_tgt
+        # self.task_obs["observation"][:, 3] = self.infos["successes"]
+        # self.task_obs["observations"][:, 3:7] = self.obs_dict["robot_vehicle_orientation"]
+        euler_angles = ssa(self.obs_dict["robot_euler_angles"])
+        perturbed_euler_angles = euler_angles + 0.1 * (torch.rand_like(euler_angles) - 0.5)
+        self.task_obs["observations"][:, 4] = perturbed_euler_angles[:, 0]
+        self.task_obs["observations"][:, 5] = perturbed_euler_angles[:, 1]
+        self.task_obs["observations"][:, 6] = 0.0
         self.task_obs["observations"][:, 7:10] = self.obs_dict["robot_body_linvel"]
         self.task_obs["observations"][:, 10:13] = self.obs_dict["robot_body_angvel"]
         self.task_obs["observations"][:, 13:17] = self.obs_dict["robot_actions"]
-        self.task_obs["observations"][:, 17:] = self.image_latents
+        if self.task_config.vae_config.use_vae:
+            self.task_obs["observations"][:, 17:] = self.image_latents
         self.task_obs["rewards"] = self.rewards
         self.task_obs["terminations"] = self.terminations
         self.task_obs["truncations"] = self.truncations
+
+        self.task_obs["image_obs"] = self.obs_dict["depth_range_pixels"]
 
     def compute_rewards_and_crashes(self, obs_dict):
         robot_position = obs_dict["robot_position"]
@@ -413,7 +470,7 @@ def compute_reward(
     parameter_dict,
 ):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, Dict[str, Tensor]) -> Tuple[Tensor, Tensor]
-    MULTIPLICATION_FACTOR_REWARD = (1.0 + (2.0) * curriculum_progress_fraction) * 3.0
+    MULTIPLICATION_FACTOR_REWARD = 1.0 + (2.0) * curriculum_progress_fraction
     dist = torch.norm(pos_error, dim=1)
     prev_dist_to_goal = torch.norm(prev_pos_error, dim=1)
     pos_reward = exponential_reward_function(
@@ -426,9 +483,14 @@ def compute_reward(
         parameter_dict["very_close_to_goal_reward_exponent"],
         dist,
     )
-    getting_closer_reward = parameter_dict["getting_closer_reward_multiplier"] * (
-        prev_dist_to_goal - dist
+
+    getting_closer = prev_dist_to_goal - dist
+    getting_closer_reward = torch.where(
+        getting_closer > 0,
+        parameter_dict["getting_closer_reward_multiplier"] * getting_closer,
+        2.0 * parameter_dict["getting_closer_reward_multiplier"] * getting_closer,
     )
+
     distance_from_goal_reward = (20.0 - dist) / 20.0
     action_diff = action - prev_action
     x_diff_penalty = exponential_penalty_function(
