@@ -1,6 +1,6 @@
+from aerial_gym.utils.vae.VAE import VAE
 import torch
 import os
-from aerial_gym.utils.vae.VAE import VAE
 
 
 def clean_state_dict(state_dict):
@@ -70,3 +70,19 @@ class VAEImageEncoder:
         Function to get latent space dims
         """
         return self.config.latent_dims
+
+
+if __name__ == "__main__":
+    from torchinfo import summary
+    from aerial_gym.utils.vae.VAE import ImgEncoder, ImgDecoder
+
+    LATENT_DIM = 64
+    device = torch.device("cuda")
+    # encoder = ImgEncoder(input_dim=1, latent_dim=LATENT_DIM).to(device)
+    # summary(encoder, input_size=(32, 1, 270, 480), device=device.type)
+
+    # decoder = ImgDecoder(input_dim=1, latent_dim=LATENT_DIM).to(device)
+    # summary(decoder, input_size=(1, LATENT_DIM), device=device.type)
+
+    vae = VAE(input_dim=1, latent_dim=LATENT_DIM, with_logits=False)
+    summary(vae, input_size=(1, 1, 200, 200), device=device.type)

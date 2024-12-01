@@ -5,7 +5,7 @@ from aerial_gym import AERIAL_GYM_DIRECTORY
 class task_config:
     seed = -1
     sim_name = "base_sim"
-    env_name = "dynamic_env" #"env_with_obstacles, dynamic_env"
+    env_name = "env_with_obstacles" #"env_with_obstacles, dynamic_env"
     robot_name = "base_quadrotor" #"lmf2, base_quadrotor"
     controller_name = "lee_velocity_control" #"lmf2_velocity_control"
     args = {}
@@ -52,10 +52,11 @@ class task_config:
         latent_dims = 64
         model_file = (
             AERIAL_GYM_DIRECTORY
-            + "/aerial_gym/utils/vae/weights/ICRA_test_set_more_sim_data_kld_beta_3_LD_64_epoch_49.pth"
+            # + "/aerial_gym/utils/vae/weights/ICRA_test_set_more_sim_data_kld_beta_3_LD_64_epoch_49.pth"
+            + "/aerial_gym/utils/vae/weights/pulp_dronet_v3_vae.pth"
         )
         model_folder = AERIAL_GYM_DIRECTORY
-        image_res = (270, 480)
+        image_res = (200, 200)
         interpolation_mode = "nearest"
         return_sampled_latent = True
 
