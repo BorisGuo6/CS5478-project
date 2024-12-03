@@ -22,7 +22,6 @@ Run:
 python3 runner.py --file=./ppo_aerial_quad_navigation.yaml --num_envs=16 --headless=False --task=navigation_task --checkpoint=./checkpoints/gen_ppo_03-01-06-11_dronetV3_navObs/nn/gen_ppo.pth --play
 ```
 
-```
 ## STEP4 Run PPO
 
 This is for running the custom PPO agent for the environment
