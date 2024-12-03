@@ -175,7 +175,7 @@ class ImgEncoder(nn.Module):
         self.dropout = nn.Dropout(p=0.5, inplace=False)
         # Fully connected layer
         self.fc = nn.Linear(in_features=128*7*7, out_features=512, bias=False)
-        self.fc_sig = nn.Sigmoid()
+        self.fc_elu = nn.ELU()
         # Latent layer
         self.fc_latent = nn.Linear(in_features=512, out_features=2 * self.latent_dim)
 
@@ -239,7 +239,7 @@ class ImgEncoder(nn.Module):
         # Fully connected layer
         x = x6_3.view(x6_3.size(0), -1)
         x = self.fc(x)
-        x = self.fc_sig(x)
+        x = self.fc_elu(x)
         # Latent layer
         x = self.fc_latent(x)
         return x

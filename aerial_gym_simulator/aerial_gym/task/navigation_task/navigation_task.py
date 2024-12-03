@@ -307,8 +307,6 @@ class NavigationTask(BaseTask):
         # needs to be returned.
 
         transformed_action = self.action_transformation_function(actions)
-        # backup obs_dict before step
-        # self.check_obs_dict(self.obs_dict)    
         logger.debug(f"raw_action: {actions}, transformed action: {transformed_action}")
         #add the obstacle actions here
         num_assets_in_env = self.sim_env.IGE_env.num_assets_per_env - 1
