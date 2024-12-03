@@ -19,5 +19,5 @@ python ./aerial_gym_simulator/aerial_gym/utils/vae/vae_image_training.py
 This is for running the simulator for the D+P VAE version of policy
 Run:
 ```
-python3 runner.py --file=./ppo_aerial_quad_navigation.yaml --num_envs=16 --headless=False --task=navigation_task --checkpoint=./runs/gen_ppo_03-01-06-11_dronetV3_navObs/nn/gen_ppo.pth --play
+python3 runner.py --file=./ppo_aerial_quad_navigation.yaml --num_envs=16 --headless=False --task=navigation_task --checkpoint=./checkpoints/gen_ppo_03-01-06-11_dronetV3_navObs/nn/gen_ppo.pth --play
 ```
