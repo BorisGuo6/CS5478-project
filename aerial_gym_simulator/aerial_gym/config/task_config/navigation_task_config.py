@@ -5,17 +5,17 @@ from aerial_gym import AERIAL_GYM_DIRECTORY
 class task_config:
     seed = -1
     sim_name = "base_sim"
-    env_name = "env_with_obstacles"
-    robot_name = "base_quadrotor"
-    controller_name = "lee_velocity_control"
+    env_name = "env_with_obstacles" #"env_with_obstacles, dynamic_env"
+    robot_name = "base_quadrotor" #"lmf2, base_quadrotor"
+    controller_name = "lee_velocity_control" #"lmf2_velocity_control"
     args = {}
     num_envs = 1024
-    use_warp = True
+    use_warp = False
     headless = True
     device = "cuda:0"
-    observation_space_dim = 13 + 4 + 64  # root_state + action_dim _+ latent_dims
-    privileged_observation_space_dim = 0
     action_space_dim = 4
+    observation_space_dim = 13 + action_space_dim + 64 # root_state + action_dim _+ latent_dims = 13 + 4 + 64 = 81
+    privileged_observation_space_dim = 0
     episode_len_steps = 100  # real physics time for simulation is this value multiplied by sim.dt
 
     return_state_before_reset = (
@@ -38,13 +38,13 @@ class task_config:
         "z_action_diff_penalty_exponent": 5.0,
         "yawrate_action_diff_penalty_magnitude": 0.8,
         "yawrate_action_diff_penalty_exponent": 3.33,
-        "x_absolute_action_penalty_magnitude": 1.6,
+        "x_absolute_action_penalty_magnitude": 0.1,
         "x_absolute_action_penalty_exponent": 0.3,
         "z_absolute_action_penalty_magnitude": 1.5,
         "z_absolute_action_penalty_exponent": 1.0,
         "yawrate_absolute_action_penalty_magnitude": 1.5,
         "yawrate_absolute_action_penalty_exponent": 2.0,
-        "collision_penalty": -20.0,
+        "collision_penalty": -100.0,
     }
 
     class vae_config:
@@ -52,16 +52,17 @@ class task_config:
         latent_dims = 64
         model_file = (
             AERIAL_GYM_DIRECTORY
-            + "/aerial_gym/utils/vae/weights/ICRA_test_set_more_sim_data_kld_beta_3_LD_64_epoch_49.pth"
+            # + "/aerial_gym/utils/vae/weights/ICRA_test_set_more_sim_data_kld_beta_3_LD_64_epoch_49.pth"
+            + "/aerial_gym/utils/vae/weights/pulp_dronet_v3_vae.pth"
         )
         model_folder = AERIAL_GYM_DIRECTORY
-        image_res = (270, 480)
+        image_res = (200, 200)
         interpolation_mode = "nearest"
         return_sampled_latent = True
 
     class curriculum:
-        min_level = 10
-        max_level = 45
+        min_level = 15
+        max_level = 50
         check_after_log_instances = 2048
         increase_step = 2
         decrease_step = 1
@@ -75,10 +76,24 @@ class task_config:
                 return max(current_level - self.decrease_step, self.min_level)
             return current_level
 
+    # def action_transformation_function(action):
+    #     clamped_action = torch.clamp(action, -1.0, 1.0)
+    #     max_speed = 1.5  # [m/s]
+    #     max_yawrate = torch.pi / 3  # [rad/s]
+    #     processed_action = clamped_action.clone()
+    #     processed_action[:, 0:3] = max_speed*processed_action[:, 0:3]
+    #     processed_action[:, 3] = max_yawrate*processed_action[:, 3]
+    #     return processed_action
+
     def action_transformation_function(action):
         clamped_action = torch.clamp(action, -1.0, 1.0)
         max_speed = 2.0  # [m/s]
         max_yawrate = torch.pi / 3  # [rad/s]
+
+        # clamped_action[:, 0:3] = max_speed * clamped_action[:, 0:3]
+        # clamped_action[:, 3] = max_yawrate * clamped_action[:, 3]
+        # return clamped_action
+
         max_inclination_angle = torch.pi / 4  # [rad]
 
         clamped_action[:, 0] += 1.0

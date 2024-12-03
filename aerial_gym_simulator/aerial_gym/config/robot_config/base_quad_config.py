@@ -8,8 +8,18 @@ from aerial_gym.config.sensor_config.camera_config.base_depth_camera_config impo
 from aerial_gym.config.sensor_config.lidar_config.base_lidar_config import (
     BaseLidarConfig,
 )
+
+from aerial_gym.config.sensor_config.camera_config.base_normal_faceID_camera_config import (
+    BaseNormalFaceIDCameraConfig,
+)
+
+from aerial_gym.config.sensor_config.camera_config.d455_depth_config import (
+    RsD455Config,
+)
+
 from aerial_gym.config.sensor_config.lidar_config.osdome_64_config import OSDome_64_Config
 from aerial_gym.config.sensor_config.imu_config.base_imu_config import BaseImuConfig
+from aerial_gym.config.sensor_config.imu_config.vn100_config import VN100Config
 
 
 class BaseQuadCfg:
@@ -49,13 +59,13 @@ class BaseQuadCfg:
 
     class sensor_config:
         enable_camera = True
-        camera_config = BaseDepthCameraConfig
+        camera_config = RsD455Config #BaseDepthCameraConfig  # BaseNormalFaceIDCameraConfig
 
         enable_lidar = False
         lidar_config = BaseLidarConfig  # OSDome_64_Config
 
-        enable_imu = False
-        imu_config = BaseImuConfig
+        enable_imu = True  #False
+        imu_config = VN100Config    #BaseImuConfig
 
     class disturbance:
         enable_disturbance = True
@@ -158,13 +168,26 @@ class BaseQuadCfg:
             [1.0, 1.0, 1.0, 1.0],
             [-0.13, -0.13, 0.13, 0.13],
             [-0.13, 0.13, 0.13, -0.13],
-            [0.01, -0.01, 0.01, -0.01],
+            [-0.01, 0.01, -0.01, 0.01],
         ]
 
         class motor_model_config:
-            motor_time_constant_min = 0.01
-            motor_time_constant_max = 0.03
+            use_rps = True
+
+            motor_thrust_constant_min = 0.00000926312
+            motor_thrust_constant_max = 0.00001826312
+
+            motor_time_constant_increasing_min = 0.09
+            motor_time_constant_increasing_max = 0.12
+
+            motor_time_constant_decreasing_min = 0.03
+            motor_time_constant_decreasing_max = 0.05
+
             max_thrust = 2
             min_thrust = 0
-            max_thrust_rate = 100.0
+
+            max_thrust_rate = 100000.0
             thrust_to_torque_ratio = 0.01
+            use_discrete_approximation = (
+                False  # Setting to false will compute f' based on difference and time constant
+            )

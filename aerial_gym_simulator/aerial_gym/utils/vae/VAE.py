@@ -82,9 +82,9 @@ class ImgEncoder(nn.Module):
         super(ImgEncoder, self).__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
-        self.define_encoder()
+        self.define_encoder_dronet()
         self.elu = nn.ELU()
-        print("Defined encoder.")
+        print(f"Defined encoder with input_dim: {input_dim} and latent_dim: {latent_dim}")
 
     def define_encoder(self):
         # define conv functions
@@ -113,8 +113,136 @@ class ImgEncoder(nn.Module):
 
         print("Encoder network initialized.")
 
+    def define_encoder_dronet(self):
+        # first convolutional layer: 32 filters of size 5x5, 200x200, /2
+        self.conv0 = nn.Conv2d(in_channels=self.input_dim, out_channels=32, kernel_size=5, stride=2, padding=2, dilation=1, groups=1, bias=False, padding_mode='zeros')
+        self.conv0_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv0_relu = nn.ReLU(inplace=False)
+        # Max pooling layer: max_pool 2x2, 32, 100x100, /2
+        self.max_pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, return_indices=False, ceil_mode=False)
+        # Three blocks of Depthwise separable convolutions
+        # Block 1: depthwise separable convolution, 32, 32, 25x25, /2
+        self.conv1_dw = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1, dilation=1, groups=32, bias=False, padding_mode='zeros')
+        self.conv1_dw_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv1_dw_relu = nn.ReLU6(inplace=False)
+        # Block 1: pointwise separable convolution, 32, 32, 25x25, /1
+        self.conv1_pw = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=1, bias=False)
+        self.conv1_pw_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv1_pw_relu = nn.ReLU6(inplace=False)
+        # Block 2: depthwise separable convolution, 32, 32, 50x50, /2
+        self.conv2_dw = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1, dilation=1, groups=32, bias=False, padding_mode='zeros')
+        self.conv2_dw_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv2_dw_relu = nn.ReLU6(inplace=False)
+        # Block 2: pointwise separable convolution, 32, 32, 50x50, /1
+        self.conv2_pw = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=1, bias=False)
+        self.conv2_pw_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv2_pw_relu = nn.ReLU6(inplace=False)
+
+        # Block 3: depthwise separable convolution, 32, 32, 50x50, /2
+        self.conv3_dw = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1, dilation=1, groups=32, bias=False, padding_mode='zeros')
+        self.conv3_dw_bn = nn.BatchNorm2d(num_features=32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv3_dw_relu = nn.ReLU6(inplace=False)
+        # Block 3: pointwise separable convolution, 32, 64, 50x50, /1
+        self.conv3_pw = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=1, bias=False)
+        self.conv3_pw_bn = nn.BatchNorm2d(num_features=64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv3_pw_relu = nn.ReLU6(inplace=False)
+        # Block 4: depthwise separable convolution, 64, 64, 13x13, /2
+        self.conv4_dw = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1, dilation=1, groups=64, bias=False, padding_mode='zeros')
+        self.conv4_dw_bn = nn.BatchNorm2d(num_features=64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv4_dw_relu = nn.ReLU6(inplace=False)
+        # Block 4: pointwise separable convolution, 64, 64, 13x13, /1
+        self.conv4_pw = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=1, bias=False)
+        self.conv4_pw_bn = nn.BatchNorm2d(num_features=64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv4_pw_relu = nn.ReLU6(inplace=False)
+
+        # Block 5: depthwise separable convolution, 64, 64, 13x13, /2
+        self.conv5_dw = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=2, padding=1, dilation=1, groups=64, bias=False, padding_mode='zeros')
+        self.conv5_dw_bn = nn.BatchNorm2d(num_features=64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv5_dw_relu = nn.ReLU6(inplace=False)
+        # Block 5: pointwise separable convolution, 64, 128, 13x13, /1
+        self.conv5_pw = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=1, bias=False)
+        self.conv5_pw_bn = nn.BatchNorm2d(num_features=128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv5_pw_relu = nn.ReLU6(inplace=False)
+        # Block 6: depthwise separable convolution, 128, 128, 7x7, /1
+        self.conv6_dw = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1, dilation=1, groups=128, bias=False, padding_mode='zeros')
+        self.conv6_dw_bn = nn.BatchNorm2d(num_features=128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv6_dw_relu = nn.ReLU6(inplace=False)
+        # Block 6: pointwise separable convolution, 128, 128, 7x7, /1
+        self.conv6_pw = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=1, bias=False)
+        self.conv6_pw_bn = nn.BatchNorm2d(num_features=128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.conv6_pw_relu = nn.ReLU6(inplace=False)
+        # Dropout layer
+        self.dropout = nn.Dropout(p=0.5, inplace=False)
+        # Fully connected layer
+        self.fc = nn.Linear(in_features=128*7*7, out_features=512, bias=False)
+        self.fc_elu = nn.ELU()
+        # Latent layer
+        self.fc_latent = nn.Linear(in_features=512, out_features=2 * self.latent_dim)
+
+        print("Encoder network initialized: DRONETv3")
+
     def forward(self, img):
-        return self.encode(img)
+        return self.encode_dronet(img)
+    
+    def encode_dronet(self, img):
+        # First convolutional layer
+        x0_0 = self.conv0(img)
+        x0_1 = self.conv0_bn(x0_0)
+        x0_1 = self.conv0_relu(x0_1)
+        # Max pooling layer
+        x0_1 = self.max_pool(x0_1)
+        # Three blocks of Depthwise separable convolutions
+        # Block 1
+        x1_0 = self.conv1_dw(x0_1)
+        x1_1 = self.conv1_dw_bn(x1_0)
+        x1_1 = self.conv1_dw_relu(x1_1)
+        x1_2 = self.conv1_pw(x1_1)
+        x1_3 = self.conv1_pw_bn(x1_2)
+        x1_3 = self.conv1_pw_relu(x1_3)
+        # Block 2
+        x2_0 = self.conv2_dw(x1_3)
+        x2_1 = self.conv2_dw_bn(x2_0)
+        x2_1 = self.conv2_dw_relu(x2_1)
+        x2_2 = self.conv2_pw(x2_1)
+        x2_3 = self.conv2_pw_bn(x2_2)
+        x2_3 = self.conv2_pw_relu(x2_3)
+        # Block 3
+        x3_0 = self.conv3_dw(x2_3)
+        x3_1 = self.conv3_dw_bn(x3_0)
+        x3_1 = self.conv3_dw_relu(x3_1)
+        x3_2 = self.conv3_pw(x3_1)
+        x3_3 = self.conv3_pw_bn(x3_2)
+        x3_3 = self.conv3_pw_relu(x3_3)
+        # Block 4
+        x4_0 = self.conv4_dw(x3_3)
+        x4_1 = self.conv4_dw_bn(x4_0)
+        x4_1 = self.conv4_dw_relu(x4_1)
+        x4_2 = self.conv4_pw(x4_1)
+        x4_3 = self.conv4_pw_bn(x4_2)
+        x4_3 = self.conv4_pw_relu(x4_3)
+        # Block 5
+        x5_0 = self.conv5_dw(x4_3)
+        x5_1 = self.conv5_dw_bn(x5_0)
+        x5_1 = self.conv5_dw_relu(x5_1)
+        x5_2 = self.conv5_pw(x5_1)
+        x5_3 = self.conv5_pw_bn(x5_2)
+        x5_3 = self.conv5_pw_relu(x5_3)
+        # Block 6
+        x6_0 = self.conv6_dw(x5_3)
+        x6_1 = self.conv6_dw_bn(x6_0)
+        x6_1 = self.conv6_dw_relu(x6_1)
+        x6_2 = self.conv6_pw(x6_1)
+        x6_3 = self.conv6_pw_bn(x6_2)
+        x6_3 = self.conv6_pw_relu(x6_3)
+        # Dropout layer
+        x6_3 = self.dropout(x6_3)
+        # Fully connected layer
+        x = x6_3.view(x6_3.size(0), -1)
+        x = self.fc(x)
+        x = self.fc_elu(x)
+        # Latent layer
+        x = self.fc_latent(x)
+        return x
 
     def encode(self, img):
         """

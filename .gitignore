@@ -4,3 +4,7 @@
 ./catkin_ws/log
 ./catkin_ws/src/.catkin
 ./catkin_ws/src/.rosinstall
+
+# ignore pycache and pyc files
+*.pyc
+__pycache__/
